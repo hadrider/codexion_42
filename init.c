@@ -52,7 +52,7 @@ int	init_sim(t_sim *s)
 		s->coders[i].left = i;
 		s->coders[i].right = (i + 1) % s->count;
 		s->coders[i].compiles = 0;
-		s->coders[i].last_compile_start = s->start_ms;
+		s->coders[i].last_compile_start = 0;
 		s->coders[i].sim = s;
 		s->initialized_coders++;
 		i++;

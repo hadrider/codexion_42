@@ -37,7 +37,8 @@ void	*monitor_routine(void *arg)
 		while (i < s->count)
 		{
 			pthread_mutex_lock(&s->state_mutex);
-			if (now - s->coders[i].last_compile_start >= s->burnout)
+			if (s->coders[i].compiles > 0
+				&& now - s->coders[i].last_compile_start >= s->burnout)
 			{
 				pthread_mutex_unlock(&s->state_mutex);
 				stop_sim(s, s->coders[i].id);

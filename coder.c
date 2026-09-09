@@ -14,7 +14,10 @@ static long	get_deadline(t_coder *c)
 	long	deadline;
 
 	pthread_mutex_lock(&c->sim->state_mutex);
-	deadline = c->last_compile_start + c->sim->burnout;
+	if (c->compiles > 0)
+		deadline = c->last_compile_start + c->sim->burnout;
+	else
+		deadline = c->sim->start_ms + c->sim->burnout;
 	pthread_mutex_unlock(&c->sim->state_mutex);
 	return (deadline);
 }
@@ -22,8 +25,8 @@ static long	get_deadline(t_coder *c)
 static int	try_compile(t_coder *c)
 {
 	t_sim	*s;
-	int	first;
-	int	second;
+	int		first;
+	int		second;
 	long	deadline;
 
 	s = c->sim;
@@ -75,8 +78,9 @@ static int	try_compile(t_coder *c)
 	c->compiles++;
 	if (c->compiles >= s->required)
 	{
-		int i = 0;
-		int all_done = 1;
+		int	i = 0;
+		int	all_done = 1;
+
 		while (i < s->count)
 		{
 			if (s->coders[i].compiles < s->required)
@@ -89,7 +93,8 @@ static int	try_compile(t_coder *c)
 	pthread_mutex_unlock(&s->state_mutex);
 	if (sim_stopped(s))
 	{
-		int i = 0;
+		int	i = 0;
+
 		while (i < s->count)
 			pthread_cond_broadcast(&s->dongles[i++].cond);
 	}
