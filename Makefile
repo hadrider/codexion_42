@@ -1,5 +1,5 @@
 NAME = codexion
-CC = cc
+CC = cc -fsanitize=address -g
 CFLAGS = -Wall -Wextra -Werror -pthread
 SRC = main.c parsing.c init.c utils.c heap.c dongle.c coder.c monitor.c logger.c
 OBJ = $(SRC:.c=.o)

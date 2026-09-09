@@ -18,7 +18,7 @@ static int	parse_positive(char *s, int *value)
 			return (0);
 		i++;
 	}
-	if (n <= 0)
+	if (n < 0)
 		return (0);
 	*value = (int)n;
 	return (1);
