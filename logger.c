@@ -27,7 +27,17 @@ void	log_action(t_sim *sim, int cid, const char *action)
 	int	len;
 	long	t;
 	int	i;
+	int	stopped;
 
+	pthread_mutex_lock(&sim->log_mutex);
+	pthread_mutex_lock(&sim->state_mutex);
+	stopped = sim->stop;
+	pthread_mutex_unlock(&sim->state_mutex);
+	if (stopped && strcmp(action, "burned out") != 0)
+	{
+		pthread_mutex_unlock(&sim->log_mutex);
+		return ;
+	}
 	t = now_ms() - sim->start_ms;
 	len = 0;
 	len = number_to_text(t, buf, len);
@@ -38,7 +48,6 @@ void	log_action(t_sim *sim, int cid, const char *action)
 	while (action[i])
 		buf[len++] = action[i++];
 	buf[len++] = '\n';
-	pthread_mutex_lock(&sim->log_mutex);
 	write(1, buf, len);
 	pthread_mutex_unlock(&sim->log_mutex);
 }
