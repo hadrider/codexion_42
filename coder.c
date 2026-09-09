@@ -31,7 +31,11 @@ static int	try_compile(t_coder *c)
 	second = c->right;
 
 	if (first == second)
+	{
+		while (!sim_stopped(s))
+			usleep(1000);
 		return (0);
+	}
 
 	if (first > second)
 	{
@@ -79,10 +83,6 @@ static int	try_compile(t_coder *c)
 			s->stop = 1;
 	}
 	pthread_mutex_unlock(&s->state_mutex);
-
-	pthread_mutex_lock(&s->resource_mutex);
-	pthread_cond_broadcast(&s->resource_cond);
-	pthread_mutex_unlock(&s->resource_mutex);
 
 	return (1);
 }

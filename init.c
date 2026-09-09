@@ -20,6 +20,7 @@ static int	init_dongles(t_sim *s)
 		}
 		s->dongles[i].available_at = s->start_ms;
 		s->dongles[i].owner = -1;
+		s->dongles[i].reserved = -1;
 		s->initialized_dongles++;
 		i++;
 	}
@@ -39,12 +40,6 @@ int	init_sim(t_sim *s)
 	if (pthread_mutex_init(&s->seq_mutex, NULL) != 0)
 		return (0);
 	s->seq_mutex_ready = 1;
-	if (pthread_mutex_init(&s->resource_mutex, NULL) != 0)
-		return (0);
-	s->resource_mutex_ready = 1;
-	if (pthread_cond_init(&s->resource_cond, NULL) != 0)
-		return (0);
-	s->resource_cond_ready = 1;
 	s->start_ms = now_ms();
 	if (!init_dongles(s))
 		return (0);
@@ -83,10 +78,6 @@ void	destroy_sim(t_sim *s)
 		free(s->dongles);
 	}
 	free(s->coders);
-	if (s->resource_cond_ready)
-		pthread_cond_destroy(&s->resource_cond);
-	if (s->resource_mutex_ready)
-		pthread_mutex_destroy(&s->resource_mutex);
 	if (s->seq_mutex_ready)
 		pthread_mutex_destroy(&s->seq_mutex);
 	if (s->log_mutex_ready)

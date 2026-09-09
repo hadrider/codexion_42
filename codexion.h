@@ -36,6 +36,7 @@ typedef struct s_dongle
 	long			available_at;
 	t_heap			heap;
 	int				owner;
+	int				reserved;
 }	t_dongle;
 
 typedef struct s_sim	t_sim;
@@ -68,13 +69,9 @@ typedef struct s_sim
 	int				state_mutex_ready;
 	int				log_mutex_ready;
 	int				seq_mutex_ready;
-	int				resource_mutex_ready;
-	int				resource_cond_ready;
 	pthread_mutex_t	state_mutex;
 	pthread_mutex_t	log_mutex;
 	pthread_mutex_t	seq_mutex;
-	pthread_mutex_t	resource_mutex;
-	pthread_cond_t	resource_cond;
 	unsigned long	arrival_seq;
 	t_dongle		*dongles;
 	t_coder			*coders;
