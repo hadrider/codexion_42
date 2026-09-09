@@ -1,99 +1,92 @@
 #include "codexion.h"
 
-static int	before(t_request *a, t_request *b, t_scheduler s)
+static int before(t_request *a, t_request *b, t_scheduler policy)
 {
-	if (s == SCHED_POLICY_EDF && a->deadline != b->deadline)
+	if (policy == EDF && a->deadline != b->deadline)
 		return (a->deadline < b->deadline);
-	if (a->arrival != b->arrival)
-		return (a->arrival < b->arrival);
-	return (a->coder_id < b->coder_id);
+	if (policy == EDF && a->id != b->id)
+		return (a->id > b->id);
+	if (a->order != b->order)
+		return (a->order < b->order);
+	return (a->id < b->id);
 }
 
-static void	swap(t_request *a, t_request *b)
+static void swap(t_request *a, t_request *b)
 {
-	t_request	t;
+	t_request t;
 
 	t = *a;
 	*a = *b;
 	*b = t;
 }
 
-int	heap_push(t_heap *h, t_request r, t_scheduler s)
+int heap_push(t_heap *h, t_request r, t_scheduler policy)
 {
-	int	i;
-	int	p;
-	t_request	*n;
+	t_request *new_items;
+	int i;
+	int parent;
 
 	if (h->size == h->capacity)
 	{
-		h->capacity = (h->capacity == 0) ? 4 : h->capacity * 2;
-		n = malloc(sizeof(*n) * h->capacity);
-		if (!n)
+		h->capacity = h->capacity ? h->capacity * 2 : 8;
+		new_items = malloc(sizeof(*new_items) * h->capacity);
+		if (!new_items)
 			return (0);
-		if (h->items)
+		i = 0;
+		while (i < h->size)
 		{
-			int k;
-
-			k = 0;
-			while (k < h->size)
-			{
-				n[k] = h->items[k];
-				k++;
-			}
-			free(h->items);
+			new_items[i] = h->items[i];
+			i++;
 		}
-		h->items = n;
+		free(h->items);
+		h->items = new_items;
 	}
 	i = h->size++;
 	h->items[i] = r;
 	while (i > 0)
 	{
-		p = (i - 1) / 2;
-		if (!before(&h->items[i], &h->items[p], s))
+		parent = (i - 1) / 2;
+		if (!before(&h->items[i], &h->items[parent], policy))
 			break ;
-		swap(&h->items[i], &h->items[p]);
-		i = p;
+		swap(&h->items[i], &h->items[parent]);
+		i = parent;
 	}
 	return (1);
 }
 
-int	heap_pop(t_heap *h, t_request *r, t_scheduler s)
+int heap_pop(t_heap *h, t_request *r, t_scheduler policy)
 {
-	int	i;
-	int	l;
-	int	right;
-	int	best;
-	t_request tmp;
+	int i;
+	int left;
+	int right;
+	int best;
 
-	if (h->size == 0)
+	if (!h->size)
 		return (0);
 	*r = h->items[0];
-	h->size--;
-	if (h->size == 0)
+	--h->size;
+	if (!h->size)
 		return (1);
 	h->items[0] = h->items[h->size];
 	i = 0;
 	while (1)
 	{
-		l = i * 2 + 1;
-		right = l + 1;
-		if (l >= h->size)
+		left = i * 2 + 1;
+		if (left >= h->size)
 			break ;
-		best = l;
-		if (right < h->size && before(&h->items[right], &h->items[l],
-				s))
+		right = left + 1;
+		best = left;
+		if (right < h->size && before(&h->items[right], &h->items[left], policy))
 			best = right;
-		if (!before(&h->items[best], &h->items[i], s))
+		if (!before(&h->items[best], &h->items[i], policy))
 			break ;
-		tmp = h->items[i];
-		h->items[i] = h->items[best];
-		h->items[best] = tmp;
+		swap(&h->items[i], &h->items[best]);
 		i = best;
 	}
 	return (1);
 }
 
-void	heap_destroy(t_heap *h)
+void heap_destroy(t_heap *h)
 {
 	free(h->items);
 	h->items = NULL;

@@ -2,14 +2,18 @@
 
 # Description
 
-`codexion` is a Dining-Philosophers variant implemented with POSIX threads.
-Each coder is a thread and each dongle is a shared resource. A coder repeatedly
-compiles while holding both adjacent dongles, then debugs and refactors without
-holding dongles.
+`codexion` is a concurrent simulation of coders competing for shared USB dongles.
+Each coder is a POSIX thread. To compile, a coder must hold the two dongles next
+to them, then they debug and refactor before trying to compile again.
 
-The implementation uses per-dongle mutexes and condition variables, a hand-rolled
-binary heap for arbitration, a dedicated monitor thread for burnout detection,
-and a shared shutdown state.
+The program supports two dongle arbitration policies:
+
+- `fifo`: first request wins.
+- `edf`: earliest burnout deadline wins. Equal deadlines prefer the higher coder id.
+
+The implementation uses a small custom binary heap for each dongle, one mutex and
+condition variable per dongle, a monitor thread for burnout detection, and mutexes
+for shared state, logging, and request ordering.
 
 # Instructions
 
@@ -25,105 +29,72 @@ Run:
 ./codexion number_of_coders time_to_burnout time_to_compile time_to_debug time_to_refactor number_of_compiles_required dongle_cooldown scheduler
 ```
 
-`scheduler` must be `fifo` or `edf`. All numeric arguments must be positive
-decimal integers.
-
 Example:
 
 ```sh
-./codexion 5 800 100 100 100 3 20 fifo
+./codexion 5 1500 200 100 100 5 50 fifo
 ```
 
-# Resources
-
-- POSIX Threads: https://pubs.opengroup.org/onlinepubs/9699919799/functions/pthread_create.html
-- POSIX condition variables: https://pubs.opengroup.org/onlinepubs/9699919799/functions/pthread_cond_wait.html
-- POSIX mutexes: https://pubs.opengroup.org/onlinepubs/9699919799/functions/pthread_mutex_lock.html
-- Dining Philosophers background: https://en.wikipedia.org/wiki/Dining_philosophers_problem
-
-AI was used as an implementation and review assistant for the project structure,
-synchronization design, debugging, and documentation. The final source should
-be understood and defended by the student rather than treated as unexplained
-generated code.
+The seven numeric arguments must be positive decimal integers. The scheduler must
+be exactly `fifo` or `edf`.
 
 # Blocking cases handled
 
 ## Deadlock
 
-Coders acquire the two dongles in ascending global dongle ID order. Therefore
-there cannot be a circular wait: every dependency points toward a higher
-resource ID. This breaks the circular-wait Coffman condition structurally.
+Coders take their first dongle in opposite directions depending on coder parity.
+If the second dongle is unavailable, the first one is released. This avoids the
+classic circular wait while allowing several non-adjacent coders to compile at
+the same time. For five coders, the ring can therefore use two compiler pairs at
+once instead of forcing a single pair through a random-looking order.
 
 ## Starvation
 
-Requests are explicitly ordered in a per-dongle heap. FIFO uses arrival order.
-EDF prioritizes the earliest compile deadline and uses arrival order and coder ID
-as deterministic tie breakers.
+Every dongle has its own request heap. FIFO compares request arrival order. EDF
+compares burnout deadlines and, when deadlines are equal, selects the higher
+coder id as required by the evaluation recode.
 
 ## Cooldown
 
-Every release sets `available_at` to the current time plus the configured
-cooldown. A waiting coder remains blocked until both its request is the heap
-winner and the cooldown timestamp has passed.
+After a dongle is released, `available_at` is set to the current time plus the
+configured cooldown. A request cannot acquire the dongle before that time.
 
 ## Burnout
 
-A dedicated monitor checks every coder's last compile start at a 1 ms polling
-interval. Burnout is based on the deadline `last_compile_start + burnout`.
-The monitor logs the event and initiates shutdown.
+A dedicated monitor checks every coder every millisecond. A coder burns out when
+it has not started a new compile within `time_to_burnout` milliseconds from the
+start of the simulation or its previous compile. The monitor prints the burnout
+message and wakes all waiting threads.
+
+## Successful termination
+
+The monitor stops the simulation as soon as every coder has reached
+`number_of_compiles_required`.
 
 ## Log serialization
 
-Every complete log line is formatted before acquiring the logging mutex. The
-single output operation is protected by that mutex, preventing interleaving.
+All complete log lines are printed while holding `log_mutex`, so two threads
+cannot mix their output on the same line.
 
 # Thread synchronization mechanisms
 
-## `state_mutex`
+- `pthread_mutex_t state_mutex` protects the stop flag, compile counters, and
+  last compile timestamps.
+- `pthread_mutex_t log_mutex` serializes output.
+- `pthread_mutex_t order_mutex` assigns a unique request order.
+- Each dongle owns a mutex protecting its owner, cooldown timestamp, and heap.
+- Each dongle also owns a condition variable so waiting coders can sleep instead
+  of continuously spinning.
+- The monitor broadcasts all dongle conditions when the simulation ends, so no
+  waiting coder remains blocked during shutdown.
 
-Protects the global `stop` flag and coder compile counters / monitor snapshots.
-Without it, a coder could read stale shutdown state while another thread writes
-it, or the monitor could race with compile-count updates.
+# Resources
 
-## `log_mutex`
+- POSIX threads and mutex/condition-variable documentation.
+- Dining Philosophers synchronization and deadlock concepts.
+- The Codexion subject and its peer-evaluation requirements.
 
-Serializes complete log writes. Without it, two threads could interleave their
-output.
-
-## `seq_mutex`
-
-Protects the global request arrival sequence. Without it, simultaneous requests
-could receive duplicate or inconsistent ordering numbers.
-
-## Per-dongle `mutex`
-
-Protects `owner`, `available_at`, and the pending request heap for that dongle.
-Without it, two coders could both observe an available dongle and claim it.
-
-## Per-dongle `cond`
-
-Allows waiters to sleep until the dongle state changes or a cooldown deadline is
-approached. The condition is always checked in a `while` loop after waking.
-
-## Shutdown broadcasts
-
-When shutdown starts, every dongle condition variable is broadcast so waiters
-do not remain asleep waiting for a resource that will never become available.
-
-# Validation
-
-The intended validation commands include:
-
-```sh
-make
-make re
-valgrind --leak-check=full ./codexion 5 800 100 100 100 3 20 fifo
-cc -Wall -Wextra -Werror -pthread -fsanitize=thread *.c -o codexion-tsan
-```
-
-# Notes
-
-The source is intentionally split by responsibility: parsing, initialization,
-heap arbitration, dongle state, coder behavior, monitoring, logging, and utility
-functions. This makes the synchronization boundaries explicit for an oral
-defense.
+AI was used as a review and debugging assistant to simplify the synchronization
+logic, check edge cases, improve deterministic scheduling, and review the source
+against the subject. The final code should be understood and defended by the
+student during evaluation.

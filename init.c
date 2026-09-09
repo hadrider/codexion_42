@@ -1,8 +1,8 @@
 #include "codexion.h"
 
-static int	init_dongles(t_sim *s)
+static int init_dongles(t_sim *s)
 {
-	int	i;
+	int i;
 
 	s->dongles = malloc(sizeof(*s->dongles) * s->count);
 	if (!s->dongles)
@@ -10,37 +10,36 @@ static int	init_dongles(t_sim *s)
 	i = 0;
 	while (i < s->count)
 	{
-		memset(&s->dongles[i], 0, sizeof(t_dongle));
-		if (pthread_mutex_init(&s->dongles[i].mutex, NULL) != 0)
+		memset(&s->dongles[i], 0, sizeof(*s->dongles));
+		if (pthread_mutex_init(&s->dongles[i].mutex, NULL))
 			return (0);
-		if (pthread_cond_init(&s->dongles[i].cond, NULL) != 0)
+		if (pthread_cond_init(&s->dongles[i].cond, NULL))
 		{
 			pthread_mutex_destroy(&s->dongles[i].mutex);
 			return (0);
 		}
-		s->dongles[i].available_at = s->start_ms;
 		s->dongles[i].owner = -1;
-		s->dongles[i].reserved = -1;
+		s->dongles[i].available_at = s->start;
 		s->initialized_dongles++;
 		i++;
 	}
 	return (1);
 }
 
-int	init_sim(t_sim *s)
+int init_sim(t_sim *s)
 {
-	int	i;
+	int i;
 
-	if (pthread_mutex_init(&s->state_mutex, NULL) != 0)
+	s->start = now_ms();
+	if (pthread_mutex_init(&s->state_mutex, NULL))
 		return (0);
-	s->state_mutex_ready = 1;
-	if (pthread_mutex_init(&s->log_mutex, NULL) != 0)
+	s->state_ready = 1;
+	if (pthread_mutex_init(&s->log_mutex, NULL))
 		return (0);
-	s->log_mutex_ready = 1;
-	if (pthread_mutex_init(&s->seq_mutex, NULL) != 0)
+	s->log_ready = 1;
+	if (pthread_mutex_init(&s->order_mutex, NULL))
 		return (0);
-	s->seq_mutex_ready = 1;
-	s->start_ms = now_ms();
+	s->order_ready = 1;
 	if (!init_dongles(s))
 		return (0);
 	s->coders = malloc(sizeof(*s->coders) * s->count);
@@ -53,17 +52,16 @@ int	init_sim(t_sim *s)
 		s->coders[i].left = i;
 		s->coders[i].right = (i + 1) % s->count;
 		s->coders[i].compiles = 0;
-		s->coders[i].last_compile_start = s->start_ms;
+		s->coders[i].last_compile = s->start;
 		s->coders[i].sim = s;
-		s->initialized_coders++;
 		i++;
 	}
 	return (1);
 }
 
-void	destroy_sim(t_sim *s)
+void destroy_sim(t_sim *s)
 {
-	int	i;
+	int i;
 
 	if (s->dongles)
 	{
@@ -78,10 +76,10 @@ void	destroy_sim(t_sim *s)
 		free(s->dongles);
 	}
 	free(s->coders);
-	if (s->seq_mutex_ready)
-		pthread_mutex_destroy(&s->seq_mutex);
-	if (s->log_mutex_ready)
+	if (s->order_ready)
+		pthread_mutex_destroy(&s->order_mutex);
+	if (s->log_ready)
 		pthread_mutex_destroy(&s->log_mutex);
-	if (s->state_mutex_ready)
+	if (s->state_ready)
 		pthread_mutex_destroy(&s->state_mutex);
 }

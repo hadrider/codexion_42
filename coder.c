@@ -1,108 +1,91 @@
 #include "codexion.h"
 
-static void	sleep_ms(t_sim *sim, long duration)
+static void sleep_ms(t_sim *s, long ms)
 {
-	long	end;
+	long end;
 
-	end = now_ms() + duration;
-	while (!sim_stopped(sim) && now_ms() < end)
+	end = now_ms() + ms;
+	while (!is_stopped(s) && now_ms() < end)
 		usleep(1000);
 }
 
-static long	get_deadline(t_coder *c)
+static long deadline(t_coder *c)
 {
-	long	deadline;
+	long value;
 
 	pthread_mutex_lock(&c->sim->state_mutex);
-	deadline = c->last_compile_start + c->sim->burnout;
+	value = c->last_compile + c->sim->burnout;
 	pthread_mutex_unlock(&c->sim->state_mutex);
-	return (deadline);
+	return (value);
 }
 
-static int	try_compile(t_coder *c)
+static int take_two(t_coder *c)
 {
-	t_sim	*s;
-	int		first;
-	int		second;
-	long	deadline;
+	t_sim *s;
+	int first;
+	int second;
+	long dl;
 
 	s = c->sim;
 	first = c->left;
 	second = c->right;
-
-	if (first == second)
-	{
-		while (!sim_stopped(s))
-			usleep(1000);
-		return (0);
-	}
-
-	if (first > second)
+	if (c->id % 2 == 0)
 	{
 		first = c->right;
 		second = c->left;
 	}
-
-	deadline = get_deadline(c);
-	if (!dongles_acquire(s, first, second, c->id, deadline))
-		return (0);
-
-	if (sim_stopped(s))
+	dl = deadline(c);
+	if (first == second)
 	{
-		dongle_release(s, second, c->id);
-		dongle_release(s, first, c->id);
+		if (!take_dongle(s, first, c->id, dl))
+			return (0);
+		while (!is_stopped(s))
+			usleep(1000);
+		put_dongle(s, first, c->id);
 		return (0);
 	}
-
+	if (!take_dongle(s, first, c->id, dl))
+		return (0);
+	if (!take_dongle(s, second, c->id, dl))
+	{
+		put_dongle(s, first, c->id);
+		return (0);
+	}
+	if (is_stopped(s))
+	{
+		put_dongle(s, second, c->id);
+		put_dongle(s, first, c->id);
+		return (0);
+	}
 	pthread_mutex_lock(&s->state_mutex);
-	c->last_compile_start = now_ms();
+	c->last_compile = now_ms();
 	pthread_mutex_unlock(&s->state_mutex);
-
 	log_action(s, c->id, "is compiling");
 	sleep_ms(s, s->compile);
-
-	dongle_release(s, second, c->id);
-	dongle_release(s, first, c->id);
-
+	put_dongle(s, second, c->id);
+	put_dongle(s, first, c->id);
 	pthread_mutex_lock(&s->state_mutex);
 	c->compiles++;
-	if (c->compiles >= s->required)
-	{
-		int	i;
-		int	all_done;
-
-		i = 0;
-		all_done = 1;
-		while (i < s->count)
-		{
-			if (s->coders[i].compiles < s->required)
-				all_done = 0;
-			i++;
-		}
-		if (all_done)
-			s->stop = 1;
-	}
 	pthread_mutex_unlock(&s->state_mutex);
-
 	return (1);
 }
 
-void	*coder_routine(void *arg)
+void *coder_routine(void *arg)
 {
-	t_coder	*c;
-	t_sim	*s;
+	t_coder *c;
+	t_sim *s;
 
 	c = arg;
 	s = c->sim;
-	while (!sim_stopped(s))
+	while (!is_stopped(s))
 	{
-		if (!try_compile(c))
+		if (!take_two(c))
 			break ;
-		if (sim_stopped(s))
+		if (is_stopped(s))
 			break ;
 		log_action(s, c->id, "is debugging");
 		sleep_ms(s, s->debug);
-		if (sim_stopped(s))
+		if (is_stopped(s))
 			break ;
 		log_action(s, c->id, "is refactoring");
 		sleep_ms(s, s->refactor);

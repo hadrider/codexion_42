@@ -1,57 +1,52 @@
 #include "codexion.h"
 
-static void	stop_sim(t_sim *s, int burnout_id)
+static void stop_sim(t_sim *s, int id)
 {
-	int	i;
+	int print;
 
+	print = 0;
 	pthread_mutex_lock(&s->state_mutex);
 	if (!s->stop)
 	{
 		s->stop = 1;
-		if (burnout_id >= 0)
-		{
-			pthread_mutex_unlock(&s->state_mutex);
-			log_action(s, burnout_id, "burned out");
-			pthread_mutex_lock(&s->state_mutex);
-		}
+		print = id > 0;
 	}
 	pthread_mutex_unlock(&s->state_mutex);
-
-	i = 0;
-	while (i < s->count)
-		pthread_cond_broadcast(&s->dongles[i++].cond);
+	if (print)
+		log_action(s, id, "burned out");
+	wake_all(s);
 }
 
-void	*monitor_routine(void *arg)
+void *monitor_routine(void *arg)
 {
-	t_sim	*s;
-	long	now;
-	int		i;
-	int		all_done;
+	t_sim *s;
+	long now;
+	int i;
+	int done;
 
 	s = arg;
-	while (!sim_stopped(s))
+	while (!is_stopped(s))
 	{
 		now = now_ms();
+		done = 1;
 		i = 0;
-		all_done = 1;
 		while (i < s->count)
 		{
 			pthread_mutex_lock(&s->state_mutex);
-			if (now - s->coders[i].last_compile_start >= s->burnout)
+			if (now - s->coders[i].last_compile >= s->burnout)
 			{
 				pthread_mutex_unlock(&s->state_mutex);
 				stop_sim(s, s->coders[i].id);
 				return (NULL);
 			}
 			if (s->coders[i].compiles < s->required)
-				all_done = 0;
+				done = 0;
 			pthread_mutex_unlock(&s->state_mutex);
 			i++;
 		}
-		if (all_done)
+		if (done)
 		{
-			stop_sim(s, -1);
+			stop_sim(s, 0);
 			return (NULL);
 		}
 		usleep(1000);
