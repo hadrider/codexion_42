@@ -16,6 +16,11 @@ static void	stop_sim(t_sim *s, int burnout_id)
 		}
 	}
 	pthread_mutex_unlock(&s->state_mutex);
+
+	pthread_mutex_lock(&s->resource_mutex);
+	pthread_cond_broadcast(&s->resource_cond);
+	pthread_mutex_unlock(&s->resource_mutex);
+
 	i = 0;
 	while (i < s->count)
 		pthread_cond_broadcast(&s->dongles[i++].cond);

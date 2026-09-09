@@ -3,7 +3,7 @@
 static int	parse_positive(char *s, int *value)
 {
 	long	n;
-	int	i;
+	int		i;
 
 	if (!s || !s[0])
 		return (0);

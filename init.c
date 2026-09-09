@@ -39,6 +39,12 @@ int	init_sim(t_sim *s)
 	if (pthread_mutex_init(&s->seq_mutex, NULL) != 0)
 		return (0);
 	s->seq_mutex_ready = 1;
+	if (pthread_mutex_init(&s->resource_mutex, NULL) != 0)
+		return (0);
+	s->resource_mutex_ready = 1;
+	if (pthread_cond_init(&s->resource_cond, NULL) != 0)
+		return (0);
+	s->resource_cond_ready = 1;
 	s->start_ms = now_ms();
 	if (!init_dongles(s))
 		return (0);
@@ -52,7 +58,7 @@ int	init_sim(t_sim *s)
 		s->coders[i].left = i;
 		s->coders[i].right = (i + 1) % s->count;
 		s->coders[i].compiles = 0;
-		s->coders[i].last_compile_start = 0;
+		s->coders[i].last_compile_start = s->start_ms;
 		s->coders[i].sim = s;
 		s->initialized_coders++;
 		i++;
@@ -77,6 +83,10 @@ void	destroy_sim(t_sim *s)
 		free(s->dongles);
 	}
 	free(s->coders);
+	if (s->resource_cond_ready)
+		pthread_cond_destroy(&s->resource_cond);
+	if (s->resource_mutex_ready)
+		pthread_mutex_destroy(&s->resource_mutex);
 	if (s->seq_mutex_ready)
 		pthread_mutex_destroy(&s->seq_mutex);
 	if (s->log_mutex_ready)
