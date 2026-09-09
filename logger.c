@@ -1,9 +1,21 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   logger.c                                           :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: hadrider <hadrider@student.42.fr>          +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/09/09 13:28:58 by hadrider          #+#    #+#             */
+/*   Updated: 2026/09/09 13:28:59 by hadrider         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "codexion.h"
 
-static int add_num(char *buf, int pos, long n)
+static int	add_num(char *buf, int pos, long n)
 {
-	char tmp[20];
-	int i;
+	char	tmp[20];
+	int		i;
 
 	i = 0;
 	if (n == 0)
@@ -18,11 +30,11 @@ static int add_num(char *buf, int pos, long n)
 	return (pos);
 }
 
-void log_action(t_sim *s, int id, const char *msg)
+void	log_action(t_sim *s, int id, const char *msg)
 {
-	char buf[128];
-	int i;
-	int len;
+	char	buf[128];
+	int		i;
+	int		len;
 
 	len = add_num(buf, 0, now_ms() - s->start);
 	buf[len++] = ' ';
