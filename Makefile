@@ -1,5 +1,5 @@
 NAME = codexion
-CC = cc -fsanitize=address -g
+CC = cc
 CFLAGS = -Wall -Wextra -Werror -pthread
 SRC = main.c parsing.c init.c utils.c heap.c dongle.c coder.c monitor.c logger.c
 OBJ = $(SRC:.c=.o)
@@ -19,3 +19,5 @@ fclean: clean
 	rm -f $(NAME)
 
 re: fclean all
+
+.PHONY: clean
