@@ -34,22 +34,23 @@ static int	try_compile(t_coder *c)
 		deadline = get_deadline(c);
 		if (!dongle_acquire(s, first, c->id, deadline))
 			return (0);
+		while (!sim_stopped(s))
+			usleep(1000);
+		dongle_release(s, first, c->id);
+		return (0);
 	}
-	else
+	if (first > second)
 	{
-		if (first > second)
-		{
-			first = c->right;
-			second = c->left;
-		}
-		deadline = get_deadline(c);
-		if (!dongle_acquire(s, first, c->id, deadline))
-			return (0);
-		if (!dongle_acquire(s, second, c->id, deadline))
-		{
-			dongle_release(s, first, c->id);
-			return (0);
-		}
+		first = c->right;
+		second = c->left;
+	}
+	deadline = get_deadline(c);
+	if (!dongle_acquire(s, first, c->id, deadline))
+		return (0);
+	if (!dongle_acquire(s, second, c->id, deadline))
+	{
+		dongle_release(s, first, c->id);
+		return (0);
 	}
 	if (sim_stopped(s))
 	{
